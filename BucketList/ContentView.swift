@@ -12,12 +12,31 @@ struct ContentView: View {
     @State private var mapRegion = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 50, longitude: 0), span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25))
     @State var locations: [Location] = []
     
+    @State private var selectedLocation: Location?
+    
     var body: some View {
         ZStack {
             Map(coordinateRegion: $mapRegion, annotationItems: locations) { location in
-                MapMarker(coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude))
+                MapAnnotation(coordinate: location.coordinate) {
+                    VStack {
+                        Image(systemName: "star.circle")
+                            .resizable()
+                            .foregroundColor(.white)
+                            .background(.ultraThinMaterial)
+                            .frame(width: 44, height: 44)
+                            .clipShape(Circle())
+                        
+                        Text(location.name)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                            .fixedSize()
+                    }
+                    .onTapGesture {
+                        selectedLocation = location
+                    }
+                }
             }
-                .ignoresSafeArea()
+            .ignoresSafeArea()
             
             Circle()
                 .fill(.blue)
@@ -43,6 +62,13 @@ struct ContentView: View {
                             .clipShape(Circle())
                             .padding(.trailing)
                     }
+                }
+            }
+        }
+        .sheet(item: $selectedLocation) { place in
+            EditView(location: place) { newLocation in
+                if let index = locations.firstIndex(of: place) {
+                    locations[index] = newLocation
                 }
             }
         }
