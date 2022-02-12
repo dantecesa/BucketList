@@ -9,14 +9,11 @@ import MapKit
 import SwiftUI
 
 struct ContentView: View {
-    @State private var mapRegion = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 50, longitude: 0), span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25))
-    @State var locations: [Location] = []
-    
-    @State private var selectedLocation: Location?
+    @ObservedObject var viewModel: ViewModel = ViewModel()
     
     var body: some View {
         ZStack {
-            Map(coordinateRegion: $mapRegion, annotationItems: locations) { location in
+            Map(coordinateRegion: $viewModel.mapRegion, annotationItems: viewModel.locations) { location in
                 MapAnnotation(coordinate: location.coordinate) {
                     VStack {
                         Image(systemName: "star.circle")
@@ -32,7 +29,7 @@ struct ContentView: View {
                             .fixedSize()
                     }
                     .onTapGesture {
-                        selectedLocation = location
+                        viewModel.selectedLocation = location
                     }
                 }
             }
@@ -50,9 +47,7 @@ struct ContentView: View {
                     Spacer()
                     
                     Button {
-                        let newLocation = Location(id: UUID(), name: "Empty Location", description: "", latitude: mapRegion.center.latitude, longitude: mapRegion.center.longitude)
-                        
-                        locations.append(newLocation)
+                        viewModel.addLocation()
                     } label: {
                         Image(systemName: "plus")
                             .padding()
@@ -65,11 +60,9 @@ struct ContentView: View {
                 }
             }
         }
-        .sheet(item: $selectedLocation) { place in
+        .sheet(item: $viewModel.selectedLocation) { place in
             EditView(location: place) { newLocation in
-                if let index = locations.firstIndex(of: place) {
-                    locations[index] = newLocation
-                }
+                viewModel.updateLocation(location: newLocation)
             }
         }
     }
