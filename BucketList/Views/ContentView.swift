@@ -12,65 +12,78 @@ struct ContentView: View {
     @ObservedObject var viewModel: ViewModel = ViewModel()
     
     var body: some View {
-        ZStack {
-            Map(coordinateRegion: $viewModel.mapRegion, annotationItems: viewModel.locations) { location in
-                MapAnnotation(coordinate: location.coordinate) {
-                    VStack {
-                        Image(systemName: "star.circle")
-                            .resizable()
-                            .foregroundColor(.white)
-                            .background(.ultraThinMaterial)
-                            .frame(width: 44, height: 44)
-                            .clipShape(Circle())
-                        
-                        Text(location.name)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                            .fixedSize()
-                    }
-                    .onTapGesture {
-                        viewModel.selectedLocation = location
+        if viewModel.isUnlocked {
+            ZStack {
+                Map(coordinateRegion: $viewModel.mapRegion, annotationItems: viewModel.locations) { location in
+                    MapAnnotation(coordinate: location.coordinate) {
+                        VStack {
+                            Image(systemName: "star.circle")
+                                .resizable()
+                                .foregroundColor(.white)
+                                .background(.ultraThinMaterial)
+                                .frame(width: 44, height: 44)
+                                .clipShape(Circle())
+                            
+                            Text(location.name)
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                                .fixedSize()
+                        }
+                        .onTapGesture {
+                            viewModel.selectedLocation = location
+                        }
                     }
                 }
-            }
-            .ignoresSafeArea()
-            
-            Circle()
-                .fill(.blue)
-                .opacity(0.25)
-                .frame(width: 32, height: 32)
-            
-            VStack {
-                Spacer()
+                .ignoresSafeArea()
                 
-                HStack {
+                Circle()
+                    .fill(.blue)
+                    .opacity(0.25)
+                    .frame(width: 32, height: 32)
+                
+                VStack {
                     Spacer()
                     
-                    Button {
-                        viewModel.addLocation()
-                    } label: {
-                        Image(systemName: "plus")
-                            .padding()
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .background(.black.opacity(0.75))
-                            .clipShape(Circle())
-                            .padding(.trailing)
+                    HStack {
+                        Spacer()
+                        
+                        Button {
+                            viewModel.addLocation()
+                        } label: {
+                            Image(systemName: "plus")
+                                .padding()
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .background(.black.opacity(0.75))
+                                .clipShape(Circle())
+                                .padding(.trailing)
+                        }
                     }
                 }
             }
-        }
-        .sheet(item: $viewModel.selectedLocation) { place in
-            EditView(location: place) { newLocation in
-                viewModel.updateLocation(location: newLocation)
+            .sheet(item: $viewModel.selectedLocation) { place in
+                EditView(location: place) { newLocation, action in
+                    if action == "Save" {
+                        viewModel.updateLocation(location: newLocation)
+                    } else if action == "Delete" {
+                        viewModel.deleteLocation(place: newLocation)
+                    }
+                }
+            }
+        } else {
+            Button("Unlock Places") {
+                viewModel.authenticate()
+            }
+            .padding()
+            .background(.blue)
+            .foregroundColor(.white)
+            .clipShape(Capsule())
+            .alert("Cannot authenticate", isPresented: $viewModel.showAutenticationError) {
+                Button("OK") { }
+            } message: {
+                Text(viewModel.authenticationErrorMessage)
             }
         }
-    }
-    
-    func getDocumentsDirectory() -> URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        
-        return paths[0]
     }
 }
 

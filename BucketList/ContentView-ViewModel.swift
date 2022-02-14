@@ -7,12 +7,17 @@
 
 import Foundation
 import MapKit
+import LocalAuthentication
 
 extension ContentView {
     @MainActor class ViewModel: ObservableObject {
         @Published var mapRegion = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 50, longitude: 0), span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25))
         @Published private(set) var locations: [Location]
         @Published var selectedLocation: Location?
+        @Published var isUnlocked: Bool = false
+        
+        @Published var authenticationErrorMessage: String = ""
+        @Published var showAutenticationError: Bool = false
         
         let savePath: URL = FileManager.documentsDirectory.appendingPathComponent("savedPlaces")
         
@@ -34,10 +39,44 @@ extension ContentView {
             }
         }
         
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                let reason = "You need to authenticate to unlock your places."
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    
+                    if success {
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else {
+                        Task { @MainActor in
+                            self.authenticationErrorMessage = "Sorry, we could not authenticate you. Please try again."
+                            self.showAutenticationError = true
+                        }
+                    }
+                }
+            } else {
+                self.authenticationErrorMessage = "Sorry, your device does not have biometrics."
+                self.showAutenticationError = true
+            }
+        }
+        
         func addLocation() {
             let newLocation = Location(id: UUID(), name: "Empty Location", description: "", latitude: mapRegion.center.latitude, longitude: mapRegion.center.longitude)
             
             locations.append(newLocation)
+            save()
+        }
+        
+        func deleteLocation(place: Location) {
+            guard let index = locations.firstIndex(of: place) else { return }
+            print("We found the item to delete!")
+            locations.remove(at: index)
+            print("We've deleted it!")
             save()
         }
         

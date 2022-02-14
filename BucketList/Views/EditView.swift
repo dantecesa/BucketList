@@ -8,37 +8,33 @@
 import SwiftUI
 
 struct EditView: View {
-    enum LoadingState {
-        case loading, loaded, failed
-    }
+    @ObservedObject var viewModel: ViewModel
     
     @Environment(\.dismiss) var dismiss
-    var location: Location
-    var onSave: (Location) -> Void
+    var onSave: (Location, String) -> Void
     
-    @State private var name: String
-    @State private var description: String
-    
-    @State private var loadingState = LoadingState.loading
-    @State private var pages: [Page] = []
+    init(location: Location, onSave: @escaping (Location, String) -> Void) {
+        self.viewModel = ViewModel(location: location)
+        self.onSave = onSave
+    }
     
     var body: some View {
         NavigationView {
             List {
                 Section("Name") {
-                    TextField("Name", text: $name)
+                    TextField("Name", text: $viewModel.name)
                 }
                 
                 Section("Description") {
-                    TextEditor(text: $description)
+                    TextEditor(text: $viewModel.description)
                 }
                 
                 Section("Nearby…") {
-                    switch loadingState {
+                    switch viewModel.loadingState {
                     case .loading:
                         Text("Loading…")
                     case .loaded:
-                        ForEach(pages, id:\.pageid) { page in
+                        ForEach(viewModel.pages, id:\.pageid) { page in
                             VStack(alignment: .leading) {
                                 Text(page.title)
                                     .font(.headline)
@@ -50,52 +46,38 @@ struct EditView: View {
                         Text("Please try again later.")
                     }
                 }
+                
+                Button(role: .destructive, action: {
+                    onSave(viewModel.location, "Delete")
+                    
+                    dismiss()
+                }, label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Remove this item")
+                    }
+                })
             }
             .navigationTitle("Place Details…")
             .toolbar {
-                Button("Save") {
-                    let newLocation = Location(id: UUID(), name: name, description: description, latitude: location.latitude, longitude: location.longitude)
-                    onSave(newLocation)
-                    
-                    dismiss()
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        let newLocation = viewModel.createNewLocation()
+                        onSave(newLocation, "Save")
+                        
+                        dismiss()
+                    }
                 }
             }
             .task {
-                await fetchNearbyPlaces()
+                await viewModel.fetchNearbyPlaces()
             }
-        }
-    }
-    
-    init(location: Location, onSave: @escaping (Location) -> Void) {
-        self.location = location
-        self.onSave = onSave
-        
-        _name = State(initialValue: location.name)
-        _description = State(initialValue: location.description)
-    }
-    
-    func fetchNearbyPlaces() async {
-        let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.coordinate.latitude)%7C\(location.coordinate.longitude)&action=query&prop=coordinates%7Cpageimages%7Cpageterms&colimit=50&piprop=thumbnail&pithumbsize=500&pilimit=50&wbptterms=description&generator=geosearch&ggsradius=10000&ggslimit=50&format=json"
-        
-        guard let url = URL(string: urlString) else {
-            print("Bad URL: \(urlString)")
-            return
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let items = try JSONDecoder().decode(Result.self, from: data)
-            
-            pages = items.query.pages.values.sorted()
-            loadingState = .loaded
-        } catch {
-            loadingState = .failed
         }
     }
 }
 
 struct EditView_Previews: PreviewProvider {
     static var previews: some View {
-        EditView(location: Location.example) { newLocation in }
+        EditView(location: Location.example) { newLocation, String in }
     }
 }
